@@ -345,7 +345,7 @@
             <div class="input-section">
                 <div class="input-group">
                     <input type="text" id="videoUrl" placeholder="Paste YouTube video link here...">
-                    <button id="downloadBtn">Download <i class="fas fa-download"></i></button>
+                    <button id="downloadBtn">Get Video Info <i class="fas fa-download"></i></button>
                 </div>
                 <p class="example">Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
             </div>
@@ -428,7 +428,7 @@
                 
                 // Simple validation for YouTube URL
                 if (!url || !isValidYouTubeUrl(url)) {
-                    errorText.textContent = 'Please enter a valid YouTube URL';
+                    errorText.textContent = "Please enter a valid YouTube URL";
                     error.classList.add('active');
                     return;
                 }
@@ -482,7 +482,7 @@
                 downloadOptions.innerHTML = '';
                 
                 // Video formats
-                data.formats.filter(f => f.qualityLabel).forEach(format => {
+                data.formats.filter(f => f.qualityLabel && f.hasVideo).forEach(format => {
                     const option = document.createElement('div');
                     option.className = 'option-card';
                     option.innerHTML = `
@@ -500,7 +500,7 @@
                 });
                 
                 // Audio only format
-                const audioFormat = data.formats.find(f => f.mimeType.includes('audio'));
+                const audioFormat = data.formats.find(f => f.hasAudio && !f.hasVideo);
                 if (audioFormat) {
                     const option = document.createElement('div');
                     option.className = 'option-card';
@@ -509,11 +509,11 @@
                             <i class="fas fa-music"></i>
                         </div>
                         <h4 class="option-title">MP3</h4>
-                        <p class="option-desc">Audio Only</p>
+                        <p class="option-desc">Audio Only (High Quality)</p>
                         <div class="option-size">${formatSize(audioFormat.contentLength)}</div>
                     `;
                     option.addEventListener('click', () => {
-                        downloadVideo(data.id, audioFormat.itag, 'mp3');
+                        downloadAudio(data.id);
                     });
                     downloadOptions.appendChild(option);
                 }
@@ -542,6 +542,7 @@
             
             // Format file size
             function formatSize(bytes) {
+                if (!bytes) return 'N/A';
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -550,39 +551,25 @@
             }
             
             // Download video function
-            function downloadVideo(id, itag, format) {
+            function downloadVideo(id, itag, container) {
                 loading.classList.add('active');
-                
-                axios.post('/download', { id, itag, format }, { responseType: 'blob' })
-                    .then(response => {
-                        loading.classList.remove('active');
-                        
-                        // Create a download link
-                        const url = window.URL.createObjectURL(new Blob([response.data]));
-                        const link = document.createElement('a');
-                        link.href = url;
-                        
-                        // Get filename from content disposition
-                        const contentDisposition = response.headers['content-disposition'];
-                        let filename = 'video';
-                        if (contentDisposition) {
-                            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                            if (filenameMatch.length === 2) {
-                                filename = filenameMatch[1];
-                            }
-                        }
-                        
-                        link.setAttribute('download', filename);
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
-                    })
-                    .catch(err => {
-                        loading.classList.remove('active');
-                        errorText.textContent = 'Failed to download video. Please try again.';
-                        error.classList.add('active');
-                        console.error(err);
-                    });
+                // Redirect to download endpoint (which will trigger download)
+                window.location.href = `/download?id=${id}&itag=${itag}&format=${container}`;
+                // Hide loading after 5 seconds (in case of error)
+                setTimeout(() => {
+                    loading.classList.remove('active');
+                }, 5000);
+            }
+            
+            // Download audio function
+            function downloadAudio(id) {
+                loading.classList.add('active');
+                // Redirect to audio endpoint
+                window.location.href = `/audio?id=${id}`;
+                // Hide loading after 5 seconds
+                setTimeout(() => {
+                    loading.classList.remove('active');
+                }, 5000);
             }
             
             // Initialize with a default video
